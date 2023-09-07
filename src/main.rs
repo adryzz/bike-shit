@@ -3,7 +3,7 @@
 #![feature(type_alias_impl_trait)]
 
 mod physics;
-mod r#const;
+mod values;
 
 use embassy_executor::Spawner;
 use embassy_rp::gpio::{Input, Pull};
@@ -26,11 +26,13 @@ async fn logger_task(driver: Driver<'static, USB>) {
 async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
     // Set up USB logging
-    Timer::after(Duration::from_secs(2)).await;
     log::info!("Initializing USB logger...");
     let driver = Driver::new(p.USB, Irqs);
     spawner.spawn(logger_task(driver)).unwrap();
     log::info!("Initialized USB logger.");
+
+    log::info!("Initializing OSD...");
+    spawner.spawn(osd_task()).unwrap();
 
     let mut north = Input::new(p.PIN_14, Pull::Down);
     let mut south = Input::new(p.PIN_15, Pull::Down);
@@ -52,5 +54,18 @@ async fn main(spawner: Spawner) {
 
         log::info!("A quarter of a turn happened! RPM: {}", rpm);
         // a quarter of a turn
+    }
+}
+
+#[embassy_executor::task]
+async fn osd_task() {
+    log::info!("Initialized OSD.");
+    // TODO: show banner
+    Timer::after(Duration::from_secs(2)).await;
+
+    log::info!("OSD set to refresh every {}ms.", values::OSD_REFRESH_MS);
+    loop {
+        Timer::after(Duration::from_millis(values::OSD_REFRESH_MS)).await;
+        //log::debug!("OSD refresh");
     }
 }
