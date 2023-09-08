@@ -5,6 +5,8 @@
 mod physics;
 mod values;
 
+use core::hint::unreachable_unchecked;
+
 use embassy_rp::*;
 use embassy_executor::Spawner;
 use embassy_rp::gpio::{Input, Pull};
@@ -28,14 +30,16 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     panic_persist::report_panic_info(info);
 
     // clear watchdog scratch register
-    let p = unsafe { Peripherals::steal() };
-    let mut watchdog = Watchdog::new(p.WATCHDOG);
-    watchdog.set_scratch(0, 0);
-
-    watchdog.trigger_reset();
-
-    // unreachable
-    unreachable!()
+    unsafe {
+        let p = Peripherals::steal();
+        let mut watchdog = Watchdog::new(p.WATCHDOG);
+        watchdog.set_scratch(0, 0);
+    
+        watchdog.trigger_reset();
+    
+        // unreachable
+        unreachable_unchecked()
+    }
 }
 
 #[embassy_executor::task]
