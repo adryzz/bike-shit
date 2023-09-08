@@ -117,6 +117,7 @@ dependencies = [
  "embedded-io 0.4.0",
  "heapless",
  "log",
+ "panic-persist",
  "panic-probe",
  "rand_core",
  "ssd1306",
@@ -1119,6 +1120,15 @@ name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
+
+[[package]]
+name = "panic-persist"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32bb382689ecd2c4d2d4df9fd56700ba8d43b7b31cca11018cc0e6f8aef39fd5"
+dependencies = [
+ "cortex-m",
+]
 
 [[package]]
 name = "panic-probe"

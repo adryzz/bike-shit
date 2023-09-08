@@ -13,12 +13,30 @@ use embassy_rp::usb::Driver;
 use embassy_rp::watchdog::Watchdog;
 use embassy_rp::{bind_interrupts, i2c};
 use embassy_time::{Duration, Timer, Instant};
-use {defmt_rtt as _, panic_probe as _};
+use panic_persist::get_panic_message_utf8;
+use {defmt_rtt as _, panic_persist as _};
 
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
     I2C0_IRQ => i2c::InterruptHandler<I2C0>;
 });
+
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+
+    // report panic info
+    panic_persist::report_panic_info(info);
+
+    // clear watchdog scratch register
+    let p = unsafe { Peripherals::steal() };
+    let mut watchdog = Watchdog::new(p.WATCHDOG);
+    watchdog.set_scratch(0, 0);
+
+    watchdog.trigger_reset();
+
+    // unreachable
+    unreachable!()
+}
 
 #[embassy_executor::task]
 async fn logger_task(driver: Driver<'static, USB>) {
@@ -32,17 +50,27 @@ async fn main(spawner: Spawner) {
     // Start up watchdog
     let mut watchdog = Watchdog::new(p.WATCHDOG);
     watchdog.pause_on_debug(true);
+    let watchdog_reset = watchdog.get_scratch(0) == values::WATCHDOG_SCRATCH0_VALUE;
+    watchdog.set_scratch(0, values::WATCHDOG_SCRATCH0_VALUE);
     watchdog.start(Duration::from_millis(values::WATCHDOG_TIMER_MS));
     spawner.spawn(watchdog_feeder(watchdog)).unwrap();
 
     // Set up USB logging
-    log::info!("[boot] Initializing USB logger...");
     let driver = Driver::new(p.USB, Irqs);
     spawner.spawn(logger_task(driver)).unwrap();
 
     // wait before starting up
     Timer::after(Duration::from_secs(2)).await;
+    log::info!("[boot] Initialized Watchdog.");
     log::info!("[boot] Initialized USB logger.");
+
+    if watchdog_reset {
+        log::warn!("[boot] Watchdog reset!");
+    }
+
+    if let Some(msg) = get_panic_message_utf8() {
+        log::warn!("[boot] {}", msg);
+    }
 
     log::info!("[boot] Initializing GPS...");
     spawner.spawn(gps_task()).unwrap();
@@ -89,9 +117,6 @@ async fn gps_task() {
 async fn imu_task(i2c: I2C0, scl: PIN_5, sda: PIN_4) {
     let _i2c = i2c::I2c::new_async(i2c, scl, sda, Irqs, i2c::Config::default());
     log::info!("[imu] Initialized IMU.");
-    loop {
-
-    }
 }
 
 #[embassy_executor::task]
@@ -110,9 +135,8 @@ async fn osd_task() {
 /// This makes sure that if a task blocks for more than WATCHDOG_TIMER_MS, the device will reset.
 #[embassy_executor::task]
 async fn watchdog_feeder(mut watchdog: Watchdog) {
-    watchdog.feed();
     loop {
-        Timer::after(Duration::from_millis(values::WATCHDOG_TIMER_MS / 2)).await;
         watchdog.feed();
+        Timer::after(Duration::from_millis(values::WATCHDOG_TIMER_MS / 2)).await;
     }
 }

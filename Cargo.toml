@@ -19,6 +19,7 @@ embedded-graphics = { version = "0.8.0", features = ["defmt", "fixed_point"] }
 embedded-io = { version = "0.4.0", features = ["defmt", "async"] }
 heapless = "0.7.16"
 log = "0.4.18"
+panic-persist = { version = "0.3.0", features = ["utf8", "custom-panic-handler"] }
 panic-probe = { version = "0.3.1", features = ["defmt"] }
 rand_core = "0.6.4"
 ssd1306 = "0.8.0"
