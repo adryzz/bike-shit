@@ -1,4 +1,5 @@
 use core::f32::consts::PI;
+pub const WATCHDOG_TIMER_MS: u64 = 1000;
 pub const OSD_REFRESH_MS: u64 = 20;
 pub const WHEEL_DIAMETER_MM: u64 = 650;
 
