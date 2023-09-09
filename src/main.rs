@@ -69,16 +69,15 @@ async fn main(spawner: Spawner) {
     watchdog.set_scratch(0, values::WATCHDOG_SCRATCH0_VALUE);
     watchdog.start(Duration::from_millis(values::WATCHDOG_TIMER_MS));
     spawner.spawn(watchdog_feeder(watchdog)).unwrap();
+    embassy_futures::yield_now().await;
 
     // Set up USB logging
     #[cfg(feature = "usb-log")]
     let driver = Driver::new(p.USB, Irqs);
     #[cfg(feature = "usb-log")]
     spawner.spawn(logger_task(driver)).unwrap();
+    embassy_futures::yield_now().await;
 
-    // wait before starting up
-    #[cfg(feature = "usb-log")]
-    Timer::after(Duration::from_secs(2)).await;
     defmt::info!("[boot] Initialized Watchdog.");
     #[cfg(feature = "usb-log")]
     defmt::info!("[boot] Initialized USB logger.");
@@ -94,13 +93,18 @@ async fn main(spawner: Spawner) {
 
     defmt::info!("[boot] Initializing GPS...");
     spawner.spawn(gps_task()).unwrap();
+    embassy_futures::yield_now().await;
 
     defmt::info!("[boot] Initializing IMU...");
     spawner.spawn(imu_task(p.I2C0, p.PIN_5, p.PIN_4)).unwrap();
+    embassy_futures::yield_now().await;
 
     defmt::info!("[boot] Initializing OSD...");
     spawner.spawn(osd_task()).unwrap();
+    embassy_futures::yield_now().await;
 
+    // ensure all initialization sequences have indeed started
+    embassy_futures::yield_now().await;
     defmt::info!("[boot] Boot complete.");
 
 
