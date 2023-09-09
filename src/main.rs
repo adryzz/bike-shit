@@ -5,6 +5,7 @@
 mod physics;
 mod values;
 
+#[cfg(feature = "usb-log")]
 use core::hint::unreachable_unchecked;
 
 use embassy_rp::*;
@@ -15,14 +16,22 @@ use embassy_rp::usb::Driver;
 use embassy_rp::watchdog::Watchdog;
 use embassy_rp::{bind_interrupts, i2c};
 use embassy_time::{Duration, Timer, Instant};
+#[cfg(feature = "usb-log")]
 use panic_persist::get_panic_message_utf8;
-use {defmt_rtt as _, panic_persist as _};
+use defmt_rtt as _;
+
+#[cfg(feature = "usb-log")]
+use {panic_persist as _, log as defmt};
+
+#[cfg(not(feature = "usb-log"))]
+use panic_probe as _;
 
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
     I2C0_IRQ => i2c::InterruptHandler<I2C0>;
 });
 
+#[cfg(feature = "usb-log")]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
 
@@ -60,32 +69,37 @@ async fn main(spawner: Spawner) {
     spawner.spawn(watchdog_feeder(watchdog)).unwrap();
 
     // Set up USB logging
+    #[cfg(feature = "usb-log")]
     let driver = Driver::new(p.USB, Irqs);
+    #[cfg(feature = "usb-log")]
     spawner.spawn(logger_task(driver)).unwrap();
 
     // wait before starting up
+    #[cfg(feature = "usb-log")]
     Timer::after(Duration::from_secs(2)).await;
-    log::info!("[boot] Initialized Watchdog.");
-    log::info!("[boot] Initialized USB logger.");
+    defmt::info!("[boot] Initialized Watchdog.");
+    #[cfg(feature = "usb-log")]
+    defmt::info!("[boot] Initialized USB logger.");
 
     if watchdog_reset {
-        log::warn!("[boot] Watchdog reset!");
+        defmt::warn!("[boot] Watchdog reset!");
     }
-
+    
+    #[cfg(feature = "usb-log")]
     if let Some(msg) = get_panic_message_utf8() {
-        log::warn!("[boot] {}", msg);
+        defmt::warn!("[boot] {}", msg);
     }
 
-    log::info!("[boot] Initializing GPS...");
+    defmt::info!("[boot] Initializing GPS...");
     spawner.spawn(gps_task()).unwrap();
 
-    log::info!("[boot] Initializing IMU...");
+    defmt::info!("[boot] Initializing IMU...");
     spawner.spawn(imu_task(p.I2C0, p.PIN_5, p.PIN_4)).unwrap();
 
-    log::info!("[boot] Initializing OSD...");
+    defmt::info!("[boot] Initializing OSD...");
     spawner.spawn(osd_task()).unwrap();
 
-    log::info!("[boot] Boot complete.");
+    defmt::info!("[boot] Boot complete.");
 
 
     let mut north_back = Input::new(p.PIN_14, Pull::Down);
@@ -107,29 +121,29 @@ async fn main(spawner: Spawner) {
 
         let rpm = 15000.0 / difference_time.as_millis() as f32;
 
-        log::info!("A quarter of a turn happened! RPM: {}", rpm);
+        defmt::info!("A quarter of a turn happened! RPM: {}", rpm);
         // a quarter of a turn
     }
 }
 
 #[embassy_executor::task]
 async fn gps_task() {
-    log::info!("[gps] Initialized GPS.");
+    defmt::info!("[gps] Initialized GPS.");
 }
 
 #[embassy_executor::task]
 async fn imu_task(i2c: I2C0, scl: PIN_5, sda: PIN_4) {
     let _i2c = i2c::I2c::new_async(i2c, scl, sda, Irqs, i2c::Config::default());
-    log::info!("[imu] Initialized IMU.");
+    defmt::info!("[imu] Initialized IMU.");
 }
 
 #[embassy_executor::task]
 async fn osd_task() {
-    log::info!("[osd] Initialized OSD.");
+    defmt::info!("[osd] Initialized OSD.");
     // TODO: show banner
     Timer::after(Duration::from_secs(2)).await;
 
-    log::info!("[osd] OSD set to refresh every {}ms.", values::OSD_REFRESH_MS);
+    defmt::info!("[osd] OSD set to refresh every {}ms.", values::OSD_REFRESH_MS);
     loop {
         Timer::after(Duration::from_millis(values::OSD_REFRESH_MS)).await;
         //log::debug!("OSD refresh");
