@@ -12,6 +12,7 @@ use embassy_rp::*;
 use embassy_executor::Spawner;
 use embassy_rp::gpio::{Input, Pull};
 use embassy_rp::peripherals::{USB, I2C0, PIN_4, PIN_5};
+#[cfg(feature = "usb-log")]
 use embassy_rp::usb::Driver;
 use embassy_rp::watchdog::Watchdog;
 use embassy_rp::{bind_interrupts, i2c};
@@ -51,6 +52,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     }
 }
 
+#[cfg(feature = "usb-log")]
 #[embassy_executor::task]
 async fn logger_task(driver: Driver<'static, USB>) {
     embassy_usb_logger::run!(1024, log::LevelFilter::Info, driver);
@@ -84,7 +86,7 @@ async fn main(spawner: Spawner) {
     if watchdog_reset {
         defmt::warn!("[boot] Watchdog reset!");
     }
-    
+
     #[cfg(feature = "usb-log")]
     if let Some(msg) = get_panic_message_utf8() {
         defmt::warn!("[boot] {}", msg);
@@ -146,7 +148,7 @@ async fn osd_task() {
     defmt::info!("[osd] OSD set to refresh every {}ms.", values::OSD_REFRESH_MS);
     loop {
         Timer::after(Duration::from_millis(values::OSD_REFRESH_MS)).await;
-        //log::debug!("OSD refresh");
+        //defmt::debug!("OSD refresh");
     }
 }
 
